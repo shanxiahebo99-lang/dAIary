@@ -1,0 +1,8 @@
+{
+  "name": "dAIary",
+  "description": "IT初心者でも続けられる、AIとの対話型日記アプリ。毎日のフィードバックと、1週間ごとの成長の振り返りを提供します。",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

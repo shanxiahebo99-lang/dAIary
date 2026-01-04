@@ -1,0 +1,391 @@
+/* Custom Styles for Modern Diary App */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Gradient Background */
+.gradient-bg {
+  background: linear-gradient(135deg, 
+    rgba(255, 182, 193, 0.3) 0%, 
+    rgba(200, 230, 255, 0.3) 50%, 
+    rgba(190, 255, 200, 0.3) 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 15s ease infinite;
+  min-height: 100vh;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Glassmorphism Card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  border-radius: 24px;
+}
+
+.glass-card-strong {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+  border-radius: 24px;
+}
+
+/* Glowing AI Feedback Section */
+.ai-feedback-glow {
+  background: linear-gradient(135deg, 
+    rgba(255, 182, 193, 0.4) 0%, 
+    rgba(200, 230, 255, 0.4) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 
+    0 8px 32px 0 rgba(255, 182, 193, 0.3),
+    0 0 40px rgba(200, 230, 255, 0.2);
+  border-radius: 24px;
+  animation: gentleGlow 3s ease-in-out infinite;
+}
+
+@keyframes gentleGlow {
+  0%, 100% { 
+    box-shadow: 
+      0 8px 32px 0 rgba(255, 182, 193, 0.3),
+      0 0 40px rgba(200, 230, 255, 0.2);
+  }
+  50% { 
+    box-shadow: 
+      0 8px 32px 0 rgba(255, 182, 193, 0.5),
+      0 0 60px rgba(200, 230, 255, 0.4);
+  }
+}
+
+/* Floating Action Buttons */
+.fab {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.fab.active {
+  background: linear-gradient(135deg, 
+    rgba(255, 182, 193, 0.8) 0%, 
+    rgba(200, 230, 255, 0.8) 100%);
+  color: white;
+}
+
+/* Streak Counter */
+.streak-counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  padding: 8px 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.fire-icon {
+  color: #ff6b6b;
+  animation: fireFlicker 2s ease-in-out infinite;
+}
+
+@keyframes fireFlicker {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Text Input Styling */
+.modern-textarea {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 20px;
+  padding: 20px;
+  font-size: 16px;
+  font-family: 'Inter', sans-serif;
+  resize: none;
+  transition: all 0.3s ease;
+}
+
+.modern-textarea:focus {
+  outline: none;
+  border-color: rgba(255, 182, 193, 0.6);
+  box-shadow: 0 0 0 4px rgba(255, 182, 193, 0.2);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* Button Styling */
+.modern-button {
+  background: linear-gradient(135deg, 
+    rgba(255, 182, 193, 0.9) 0%, 
+    rgba(200, 230, 255, 0.9) 100%);
+  border: none;
+  border-radius: 16px;
+  padding: 16px 32px;
+  font-weight: 600;
+  font-size: 16px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.modern-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.modern-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.modern-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* AI Avatar */
+.ai-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, 
+    rgba(255, 182, 193, 0.8) 0%, 
+    rgba(200, 230, 255, 0.8) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Entry Card */
+.entry-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+}
+
+.entry-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Typography */
+.large-friendly-text {
+  font-size: 24px;
+  font-weight: 600;
+  color: #2d3748;
+  letter-spacing: -0.5px;
+}
+
+.soft-text {
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+/* Navigation Bar */
+.nav-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 24px;
+  padding: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+/* Login Page Styles */
+.login-glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+  border-radius: 32px;
+}
+
+.login-input {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 16px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: rgba(255, 182, 193, 0.6);
+  box-shadow: 0 0 0 4px rgba(255, 182, 193, 0.2);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .large-friendly-text {
+    font-size: 20px;
+  }
+  
+  .nav-bar {
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    transform: none;
+    width: auto;
+  }
+
+  .glass-card-strong,
+  .glass-card {
+    padding: 1rem;
+  }
+
+  .streak-counter {
+    padding: 6px 12px;
+    font-size: 0.875rem;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .ai-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .large-friendly-text {
+    font-size: 18px;
+  }
+
+  .modern-textarea {
+    font-size: 16px; /* iOSでズームを防ぐ */
+    padding: 16px;
+  }
+
+  .login-input {
+    font-size: 16px; /* iOSでズームを防ぐ */
+    padding: 14px;
+  }
+
+  .modern-button {
+    padding: 14px 24px;
+    font-size: 15px;
+  }
+
+  .fab {
+    padding: 10px 14px;
+  }
+
+  .fab span {
+    font-size: 13px;
+  }
+
+  .glass-card-strong,
+  .glass-card {
+    padding: 1rem;
+    border-radius: 20px;
+  }
+
+  header {
+    padding: 1rem;
+    padding-top: 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.375rem;
+  }
+
+  main {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 120px;
+  }
+
+  .streak-counter {
+    padding: 6px 10px;
+    font-size: 0.8125rem;
+  }
+
+  .streak-counter span:last-child {
+    font-size: 0.8125rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .large-friendly-text {
+    font-size: 16px;
+  }
+
+  .modern-textarea {
+    height: 200px;
+  }
+
+  .nav-bar {
+    padding: 6px;
+    gap: 8px;
+  }
+
+  .fab {
+    padding: 8px 12px;
+  }
+
+  .fab span {
+    font-size: 12px;
+  }
+}
+
