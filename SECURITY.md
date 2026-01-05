@@ -1,5 +1,51 @@
 # セキュリティ対策について
 
+## 🔒 APIキーの安全性
+
+### ✅ **APIキーは完全に保護されています**
+
+**現在の実装は安全です。理由：**
+
+1. **サーバー側でのみ実行**
+   - Gemini APIキーは`api/ai/*.ts`（Vercel Functions）でのみ使用
+   - `process.env.GEMINI_API_KEY`は**サーバー側でのみアクセス可能**
+   - ブラウザ（クライアント側）には**絶対に送信されません**
+
+2. **クライアント側では使用されない**
+   - `App.tsx`や`Login.tsx`などのクライアント側コードでは、APIキーを直接使用していません
+   - クライアントは`/api/ai/*`エンドポイントを呼び出すだけ
+   - APIキーはVercel Functions内で処理されます
+
+3. **環境変数の分離**
+   - **クライアント側用**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`（`VITE_`プレフィックス）
+   - **サーバー側用**: `GEMINI_API_KEY`（`VITE_`プレフィックスなし）
+   - この命名規則により、クライアント側に誤って露出することを防いでいます
+
+4. **GitHub上でも安全**
+   - コードには`process.env.GEMINI_API_KEY`としか書かれていない
+   - 実際のキーはVercelの環境変数に保存
+   - `.env.local`は`.gitignore`に含まれているので、Gitにはプッシュされない
+
+### ⚠️ **絶対にやってはいけないこと**
+
+```typescript
+// ❌ 危険！クライアント側で実行される
+const VITE_GEMINI_API_KEY = "AIzaSy..." // コードに直接書く
+```
+
+```typescript
+// ❌ 危険！クライアント側に露出する
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY; // クライアント側で使用
+```
+
+### ✅ **安全な実装（現在の実装）**
+
+```typescript
+// ✅ 安全！サーバー側でのみ実行される
+// api/ai/feedback.ts（Vercel Functions）
+const apiKey = process.env.GEMINI_API_KEY; // サーバー側でのみアクセス可能
+```
+
 ## 実装済みのセキュリティ対策
 
 ### 1. 認証
@@ -14,7 +60,7 @@
 
 ### 3. CORS設定
 - **開発環境**: すべてのオリジンを許可（開発用）
-- **本番環境**: 特定のオリジンのみを許可するように設定を変更してください
+- **本番環境**: Vercel Functionsは自動的にCORSを処理します
 
 ## 本番環境での推奨設定
 

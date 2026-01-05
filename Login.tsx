@@ -21,10 +21,12 @@ export default function Login() {
     setIsLoading(true);
     setError('');
     try {
-      const { error: authError } = await signIn(email, password);
+      const { data, error: authError } = await signIn(email, password);
       if (authError) {
+        console.error('❌ ログインエラー:', authError);
         setError(authError.message);
       } else {
+        console.log('✅ ログイン成功:', data);
         // Save email if rememberEmail is checked
         if (rememberEmail) {
           localStorage.setItem('saved_email', email);
@@ -33,7 +35,8 @@ export default function Login() {
         }
       }
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ ログイン例外:', err);
+      setError(err.message || 'ログインに失敗しました。環境変数を確認してください。');
     } finally {
       setIsLoading(false);
     }
