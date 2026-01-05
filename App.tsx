@@ -140,6 +140,7 @@ const App: React.FC = () => {
     setIsAnalyzing(true);
 
     try {
+      console.log('📤 APIリクエスト送信:', '/api/ai/feedback');
       const res = await fetch('/api/ai/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,8 +151,11 @@ const App: React.FC = () => {
         }),
       });
 
+      console.log('📥 APIレスポンス:', res.status, res.statusText);
+
       if (!res.ok) {
         const text = await res.text();
+        console.error('❌ APIエラー:', text);
         throw new Error(text || `HTTP ${res.status}`);
       }
 
@@ -221,8 +225,22 @@ const App: React.FC = () => {
         }
       }
     } catch (e: any) {
-      console.error(e);
-      alert(`AIとの通信に失敗しました: ${e.message}`);
+      console.error('❌ AI通信エラー:', e);
+      console.error('エラー詳細:', {
+        message: e.message,
+        stack: e.stack,
+        name: e.name,
+      });
+      
+      // より詳細なエラーメッセージを表示
+      let errorMessage = 'AIとの通信に失敗しました';
+      if (e.message) {
+        errorMessage += `: ${e.message}`;
+      }
+      if (e.message?.includes('Failed to fetch')) {
+        errorMessage += '\n\n考えられる原因:\n- ネットワーク接続の問題\n- Vercel Functionsが正しく動作していない\n- CORSの問題\n\nVercelダッシュボードの「Functions」タブでログを確認してください。';
+      }
+      alert(errorMessage);
     } finally {
       setIsAnalyzing(false);
     }

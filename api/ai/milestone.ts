@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 function extractFirstJsonObject(text: string): any {
   const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
@@ -26,6 +26,9 @@ export default async function handler(req: Request) {
     });
   }
 
+  console.log('🔍 Milestone feedback - Environment check:');
+  console.log('GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✅ 設定済み' : '❌ 未設定');
+
   try {
     const { streak, personality, customInstruction } = await req.json();
 
@@ -46,14 +49,19 @@ export default async function handler(req: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'GEMINI_API_KEY is not configured' }), {
+      console.error('❌ GEMINI_API_KEY is not configured in Vercel environment variables');
+      return new Response(JSON.stringify({ 
+        error: 'GEMINI_API_KEY is not configured. Please set it in Vercel environment variables.',
+        hint: 'Vercelダッシュボード → 設定 → 環境変数 → GEMINI_API_KEY を追加してください'
+      }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-    const ai = new GoogleGenAI({ apiKey });
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     let rolePrompt = '';
     if (personality === 'custom' && customInstruction && customInstruction.trim()) {
@@ -83,12 +91,9 @@ ${rolePrompt}
 {"feedback":"ここにフィードバック本文"}
 `;
 
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: [{ text: prompt }],
-    });
-
-    const text = response.text ?? '';
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
     const json = extractFirstJsonObject(text);
 
     if (!json || typeof json.feedback !== 'string') {
@@ -104,14 +109,36 @@ ${rolePrompt}
 
     return new Response(JSON.stringify({ feedback: json.feedback }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
     });
   } catch (err: any) {
     console.error('❌ milestone error:', err);
     return new Response(JSON.stringify({ error: err?.message || String(err) }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
     });
   }
+}
+
+// CORS preflight リクエストの処理
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
 }
 
