@@ -23,6 +23,18 @@ function extractFirstJsonObject(text: string): any {
 }
 
 export default async function handler(req: Request) {
+  // CORS preflight リクエストの処理
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
+    });
+  }
+
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -33,7 +45,9 @@ export default async function handler(req: Request) {
   // デバッグ: 環境変数の確認（本番環境でもログに出力される）
   console.log('🔍 Environment check:');
   console.log('GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✅ 設定済み' : '❌ 未設定');
-  console.log('GEMINI_MODEL:', process.env.GEMINI_MODEL || 'gemini-2.0-flash (デフォルト)');
+  console.log('GEMINI_MODEL:', process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp (デフォルト)');
+  console.log('📥 リクエスト受信:', req.method, req.url);
+  console.log('📥 リクエストヘッダー:', Object.fromEntries(req.headers.entries()));
 
   try {
     const { content, personality, customInstruction } = await req.json();

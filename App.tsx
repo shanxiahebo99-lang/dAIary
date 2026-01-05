@@ -140,8 +140,15 @@ const App: React.FC = () => {
     setIsAnalyzing(true);
 
     try {
-      console.log('📤 APIリクエスト送信:', '/api/ai/feedback');
-      const res = await fetch('/api/ai/feedback', {
+      const apiUrl = '/api/ai/feedback';
+      console.log('📤 APIリクエスト送信:', apiUrl);
+      console.log('📤 リクエストボディ:', {
+        content: inputText.substring(0, 50) + '...',
+        personality: profile.personality,
+        hasCustomInstruction: !!profile.customInstruction,
+      });
+      
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -152,6 +159,7 @@ const App: React.FC = () => {
       });
 
       console.log('📥 APIレスポンス:', res.status, res.statusText);
+      console.log('📥 APIレスポンスヘッダー:', Object.fromEntries(res.headers.entries()));
 
       if (!res.ok) {
         const text = await res.text();
