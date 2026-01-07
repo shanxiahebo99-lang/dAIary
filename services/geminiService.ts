@@ -1,7 +1,8 @@
 // services/geminiService.ts
 import { DiaryEntry, UserProfile } from '../types';
 
-const API_BASE = 'http://localhost:3001/api/ai';
+// Vercel Functionsを使用するため、相対パスを使用
+const API_BASE = '/api/ai';
 
 export const generateDailyFeedback = async (
   content: string,
