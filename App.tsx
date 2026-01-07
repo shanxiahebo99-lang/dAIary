@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 import Calendar from './Calendar';
 import MyPage from './MyPage';
 import MonthlyFeedbackButton from './MonthlyFeedbackButton';
+import { saveDiaryEntry, getDiaryEntries, saveUserProfile, getUserProfile } from './supabaseService';
 
 const App: React.FC = () => {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   const [selectedEntries, setSelectedEntries] = useState<DiaryEntry[]>([]);
   const [milestoneFeedback, setMilestoneFeedback] = useState<string | null>(null);
   const [celebratedMilestones, setCelebratedMilestones] = useState<Set<number>>(new Set());
+  const [newEntryFeedback, setNewEntryFeedback] = useState<{ entry: DiaryEntry; showPopup: boolean } | null>(null);
   
   // Reset to today's date when switching to record tab
   useEffect(() => {
@@ -66,18 +68,50 @@ const App: React.FC = () => {
     };
   }, []);
 
-  /* ---------------- LocalStorage ---------------- */
+  /* ---------------- Load data from Supabase ---------------- */
   useEffect(() => {
-    const savedEntries = localStorage.getItem('ai_diary_entries');
-    const savedProfile = localStorage.getItem('ai_diary_profile');
-    if (savedEntries) setEntries(JSON.parse(savedEntries));
-    if (savedProfile) setProfile(JSON.parse(savedProfile));
-  }, []);
+    const loadData = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        // Load entries from Supabase
+        const loadedEntries = await getDiaryEntries();
+        setEntries(loadedEntries);
+        
+        // Load profile from Supabase
+        const loadedProfile = await getUserProfile();
+        if (loadedProfile) {
+          setProfile(loadedProfile);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Fallback to localStorage if Supabase fails
+        const savedEntries = localStorage.getItem('ai_diary_entries');
+        const savedProfile = localStorage.getItem('ai_diary_profile');
+        if (savedEntries) setEntries(JSON.parse(savedEntries));
+        if (savedProfile) setProfile(JSON.parse(savedProfile));
+      }
+    };
+    
+    loadData();
+  }, [isAuthenticated]);
 
+  /* ---------------- Save profile to Supabase ---------------- */
   useEffect(() => {
-    localStorage.setItem('ai_diary_entries', JSON.stringify(entries));
-    localStorage.setItem('ai_diary_profile', JSON.stringify(profile));
-  }, [entries, profile]);
+    if (!isAuthenticated) return;
+    
+    const saveProfile = async () => {
+      try {
+        await saveUserProfile(profile);
+      } catch (error) {
+        console.error('Error saving profile:', error);
+        // Fallback to localStorage
+        localStorage.setItem('ai_diary_profile', JSON.stringify(profile));
+      }
+    };
+    
+    saveProfile();
+  }, [profile, isAuthenticated]);
 
   /* ---------------- Daily Streak Calculation ---------------- */
   const dailyStreak = useMemo(() => {
@@ -178,9 +212,21 @@ const App: React.FC = () => {
         mood: data.mood,
       };
 
+      // Show feedback in popup first
+      setNewEntryFeedback({ entry: newEntry, showPopup: true });
+
       const updatedEntries = [newEntry, ...entries];
       setEntries(updatedEntries);
       setInputText('');
+
+      // Save to Supabase
+      try {
+        await saveDiaryEntry(newEntry);
+      } catch (error) {
+        console.error('Error saving diary entry:', error);
+        // Fallback to localStorage
+        localStorage.setItem('ai_diary_entries', JSON.stringify(updatedEntries));
+      }
 
       // Check for milestone (10, 20, 30, 40, 50, ...)
       // Recalculate streak after adding new entry
@@ -381,7 +427,7 @@ const App: React.FC = () => {
                   {formatDateForDisplay(selectedDate)} の記録 ({selectedEntries.length}件)
                 </h3>
                 {selectedEntries.map((entry) => (
-                  <div key={entry.id} className="glass-card-strong p-6 space-y-4">
+                  <div key={entry.id} id={`entry-feedback-${entry.id}`} className="glass-card-strong p-6 space-y-4">
                     <div className="soft-text text-base leading-relaxed whitespace-pre-wrap">
                       {entry.content}
                     </div>

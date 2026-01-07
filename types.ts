@@ -10,6 +10,7 @@ export interface DiaryEntry {
 
 export interface UserProfile {
   name: string;
+  nickname?: string; // ニックネーム
   personality: 'supportive' | 'strict' | 'philosophical' | 'custom';
   profilePicture?: string; // Base64 or URL
   customInstruction?: string; // Custom instruction for AI when personality is 'custom'

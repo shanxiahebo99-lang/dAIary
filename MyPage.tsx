@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile } from './types';
 import { supabase } from './supabase';
 import { signOut } from './auth';
+import { saveUserProfile } from './supabaseService';
 
 interface MyPageProps {
   profile: UserProfile;
@@ -19,10 +20,13 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
   const [personality, setPersonality] = useState<UserProfile['personality']>(profile.personality);
   const [customInstruction, setCustomInstruction] = useState<string>(profile.customInstruction || '');
   const [profilePicture, setProfilePicture] = useState<string | undefined>(profile.profilePicture);
+  const [nickname, setNickname] = useState<string>(profile.nickname || '');
   const [isLoading, setIsLoading] = useState(false);
   const [emailCodeSent, setEmailCodeSent] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -37,6 +41,8 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
   useEffect(() => {
     setPersonality(profile.personality);
     setCustomInstruction(profile.customInstruction || '');
+    setNickname(profile.nickname || '');
+    setProfilePicture(profile.profilePicture);
   }, [profile]);
 
   const handleSendEmailVerificationCode = async () => {
@@ -143,7 +149,7 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
     }
   };
 
-  const handleProfilePictureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -153,14 +159,90 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
     }
 
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const base64 = reader.result as string;
       setProfilePicture(base64);
       const updatedProfile = { ...profile, profilePicture: base64 };
       onProfileUpdate(updatedProfile);
-      setMessage({ type: 'success', text: 'プロフィール画像を更新しました' });
+      try {
+        await saveUserProfile(updatedProfile);
+        setMessage({ type: 'success', text: 'プロフィール画像を更新しました' });
+      } catch (error) {
+        setMessage({ type: 'error', text: 'プロフィール画像の保存に失敗しました' });
+      }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleNicknameUpdate = async () => {
+    const updatedProfile = { ...profile, nickname: nickname.trim() || undefined };
+    onProfileUpdate(updatedProfile);
+    try {
+      await saveUserProfile(updatedProfile);
+      setMessage({ type: 'success', text: 'ニックネームを更新しました' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'ニックネームの保存に失敗しました' });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      setMessage({ type: 'error', text: 'パスワードを入力してください' });
+      return;
+    }
+
+    if (!confirm('本当にアカウントを削除しますか？この操作は取り消せません。')) {
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      // パスワードで再認証
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: currentEmail,
+        password: deletePassword,
+      });
+
+      if (signInError) {
+        throw new Error('パスワードが正しくありません');
+      }
+
+      // 日記エントリを削除
+      const { error: entriesError } = await supabase
+        .from('diary_entries')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (entriesError) console.error('Error deleting entries:', entriesError);
+
+      // プロフィールを削除
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (profileError) console.error('Error deleting profile:', profileError);
+
+      // アカウントを削除（Supabase Admin APIが必要なため、ここではauth.deleteUserを使用できない）
+      // 実際の実装では、バックエンドエンドポイントを作成するか、Supabase Admin APIを使用する必要があります
+      // ここでは、ユーザーにSupabaseダッシュボードから削除してもらうか、バックエンドエンドポイントを作成する必要があります
+      
+      setMessage({ 
+        type: 'error', 
+        text: 'アカウント削除機能は現在利用できません。サポートにお問い合わせください。' 
+      });
+      
+      // 代替案: ログアウトして、ユーザーに手動で削除してもらう
+      // await signOut();
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message || 'アカウントの削除に失敗しました' });
+    } finally {
+      setIsLoading(false);
+      setShowDeleteAccount(false);
+      setDeletePassword('');
+    }
   };
 
   const handlePersonalityChange = (newPersonality: UserProfile['personality']) => {
@@ -402,11 +484,58 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
               await signOut();
             }
           }}
-          className="w-full bg-red-500 bg-opacity-80 hover:bg-opacity-100 text-white py-3 rounded-xl font-semibold transition-all duration-300"
+          className="w-full bg-red-500 bg-opacity-80 hover:bg-opacity-100 text-white py-3 rounded-xl font-semibold transition-all duration-300 mb-4"
         >
           ログアウト
         </button>
+        <button
+          onClick={() => setShowDeleteAccount(true)}
+          className="w-full bg-red-600 bg-opacity-80 hover:bg-opacity-100 text-white py-3 rounded-xl font-semibold transition-all duration-300"
+        >
+          アカウントを削除
+        </button>
       </div>
+
+      {/* Delete Account Modal */}
+      {showDeleteAccount && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="glass-card-strong p-6 max-w-md w-full">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">アカウントを削除</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              アカウントを削除すると、すべての日記データとプロフィール情報が永久に削除されます。この操作は取り消せません。
+            </p>
+            <div className="space-y-3">
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="login-input w-full"
+                placeholder="パスワードを入力（必須）"
+                disabled={isLoading}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={isLoading || !deletePassword}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50"
+                >
+                  {isLoading ? '削除中...' : '削除する'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDeleteAccount(false);
+                    setDeletePassword('');
+                  }}
+                  disabled={isLoading}
+                  className="w-24 bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-300 transition"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
