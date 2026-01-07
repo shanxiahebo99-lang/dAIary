@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 function extractFirstJsonObject(text: string): any {
   const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
@@ -18,44 +19,42 @@ function extractFirstJsonObject(text: string): any {
   }
 }
 
-export default async function handler(req: Request) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORSヘッダー
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // CORS preflight リクエストの処理
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   console.log('🔍 Milestone feedback - Environment check:');
   console.log('GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✅ 設定済み' : '❌ 未設定');
 
   try {
-    const { streak, personality, customInstruction } = await req.json();
+    const { streak, personality, customInstruction } = req.body || {};
 
     if (typeof streak !== 'number' || streak <= 0) {
-      return new Response(JSON.stringify({ error: 'streak is required (number > 0)' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return res.status(400).json({ error: 'streak is required (number > 0)' });
     }
 
     const validPersonalities = ['supportive', 'strict', 'philosophical', 'custom'];
     if (personality && !validPersonalities.includes(personality)) {
-      return new Response(JSON.stringify({ error: 'invalid personality' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return res.status(400).json({ error: 'invalid personality' });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.error('❌ GEMINI_API_KEY is not configured in Vercel environment variables');
-      return new Response(JSON.stringify({ 
+      return res.status(500).json({ 
         error: 'GEMINI_API_KEY is not configured. Please set it in Vercel environment variables.',
         hint: 'Vercelダッシュボード → 設定 → 環境変数 → GEMINI_API_KEY を追加してください'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
       });
     }
 
@@ -98,47 +97,15 @@ ${rolePrompt}
 
     if (!json || typeof json.feedback !== 'string') {
       console.error('❌ milestone response not JSON:', text);
-      return new Response(JSON.stringify({
+      return res.status(502).json({
         error: 'AIの応答がJSON形式ではありませんでした',
         raw: text,
-      }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ feedback: json.feedback }), {
-      status: 200,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
+    return res.status(200).json({ feedback: json.feedback });
   } catch (err: any) {
     console.error('❌ milestone error:', err);
-    return new Response(JSON.stringify({ error: err?.message || String(err) }), {
-      status: 500,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
+    return res.status(500).json({ error: err?.message || String(err) });
   }
 }
-
-// CORS preflight リクエストの処理
-export async function OPTIONS() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
-}
-

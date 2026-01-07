@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 function extractFirstJsonObject(text: string): any {
   // Markdownコードブロック（```json ... ```）の中のJSONを抽出
@@ -22,24 +23,19 @@ function extractFirstJsonObject(text: string): any {
   }
 }
 
-export default async function handler(req: Request) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORSヘッダー
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   // CORS preflight リクエストの処理
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
+    return res.status(204).end();
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   // デバッグ: 環境変数の確認（本番環境でもログに出力される）
@@ -47,47 +43,32 @@ export default async function handler(req: Request) {
   console.log('GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✅ 設定済み' : '❌ 未設定');
   console.log('GEMINI_MODEL:', process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp (デフォルト)');
   console.log('📥 リクエスト受信:', req.method, req.url);
-  console.log('📥 リクエストヘッダー:', { ...req.headers });
+  console.log('📥 リクエストヘッダー:', req.headers);
 
   try {
-    const { content, personality, customInstruction } = await req.json();
+    const { content, personality, customInstruction } = req.body || {};
 
     // 入力値検証
     if (!content || typeof content !== 'string' || content.trim() === '') {
-      return new Response(JSON.stringify({ error: 'content is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return res.status(400).json({ error: 'content is required' });
     }
 
     if (content.length > 10000) {
-      return new Response(JSON.stringify({ error: 'content is too long (max 10000 characters)' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return res.status(400).json({ error: 'content is too long (max 10000 characters)' });
     }
 
     const validPersonalities = ['supportive', 'strict', 'philosophical', 'custom'];
     if (personality && !validPersonalities.includes(personality)) {
-      return new Response(JSON.stringify({ error: 'invalid personality' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return res.status(400).json({ error: 'invalid personality' });
     }
 
     let sanitizedCustomInstruction: string | undefined = undefined;
     if (personality === 'custom') {
       if (!customInstruction || typeof customInstruction !== 'string' || customInstruction.trim() === '') {
-        return new Response(JSON.stringify({ error: 'customInstruction is required when personality is custom' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return res.status(400).json({ error: 'customInstruction is required when personality is custom' });
       }
       if (customInstruction.length > 500) {
-        return new Response(JSON.stringify({ error: 'customInstruction is too long (max 500 characters)' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return res.status(400).json({ error: 'customInstruction is too long (max 500 characters)' });
       }
       sanitizedCustomInstruction = customInstruction.trim();
     }
@@ -98,12 +79,9 @@ export default async function handler(req: Request) {
     if (!apiKey) {
       console.error('❌ GEMINI_API_KEY is not configured in Vercel environment variables');
       console.error('💡 解決方法: Vercelダッシュボード → 設定 → 環境変数 → GEMINI_API_KEY を追加');
-      return new Response(JSON.stringify({ 
+      return res.status(500).json({ 
         error: 'GEMINI_API_KEY is not configured. Please set it in Vercel environment variables.',
         hint: 'Vercelダッシュボード → 設定 → 環境変数 → GEMINI_API_KEY を追加してください'
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
       });
     }
 
@@ -135,26 +113,15 @@ export default async function handler(req: Request) {
 
     if (!json || typeof json.feedback !== 'string') {
       console.error('❌ Gemini response not JSON:', text);
-      return new Response(JSON.stringify({
+      return res.status(502).json({
         error: 'AIの応答がJSON形式ではありませんでした',
         raw: text,
-      }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({
+    return res.status(200).json({
       feedback: json.feedback,
       mood: typeof json.mood === 'string' ? json.mood : '不明',
-    }), {
-      status: 200,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
     });
   } catch (err: any) {
     console.error('❌ feedback error:', err);
@@ -173,10 +140,7 @@ export default async function handler(req: Request) {
       hint: 'Vercel Functionsのログを確認してください',
     };
     
-    return new Response(JSON.stringify(errorDetails), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.status(500).json(errorDetails);
   }
 }
 
