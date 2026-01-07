@@ -74,51 +74,18 @@ const App: React.FC = () => {
       if (!isAuthenticated) return;
       
       try {
-        // Load entries from Supabase
+        // 常にSupabaseからデータを読み込む（アカウントごとに同期）
         const loadedEntries = await getDiaryEntries();
-        // Supabaseにデータがある場合のみ更新（空の場合は既存データを保持）
-        if (loadedEntries.length > 0) {
-          setEntries(loadedEntries);
-        } else {
-          // Supabaseが空の場合はlocalStorageから読み込む（初回移行時）
-          const savedEntries = localStorage.getItem('ai_diary_entries');
-          if (savedEntries) {
-            const parsedEntries = JSON.parse(savedEntries);
-            if (parsedEntries.length > 0) {
-              setEntries(parsedEntries);
-              // localStorageのデータをSupabaseに移行
-              for (const entry of parsedEntries) {
-                try {
-                  await saveDiaryEntry(entry);
-                } catch (err) {
-                  console.error('Error migrating entry:', err);
-                }
-              }
-            }
-          }
-        }
+        setEntries(loadedEntries);
         
-        // Load profile from Supabase
+        // プロフィールも常にSupabaseから読み込む
         const loadedProfile = await getUserProfile();
         if (loadedProfile) {
           setProfile(loadedProfile);
-        } else {
-          // Supabaseにプロフィールがない場合はlocalStorageから読み込む
-          const savedProfile = localStorage.getItem('ai_diary_profile');
-          if (savedProfile) {
-            const parsedProfile = JSON.parse(savedProfile);
-            setProfile(parsedProfile);
-            // localStorageのデータをSupabaseに移行
-            try {
-              await saveUserProfile(parsedProfile);
-            } catch (err) {
-              console.error('Error migrating profile:', err);
-            }
-          }
         }
       } catch (error) {
         console.error('Error loading data:', error);
-        // Fallback to localStorage if Supabase fails
+        // エラー時のみlocalStorageから読み込む（フォールバック）
         const savedEntries = localStorage.getItem('ai_diary_entries');
         const savedProfile = localStorage.getItem('ai_diary_profile');
         if (savedEntries) {
@@ -140,13 +107,15 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
     
+    // 初回ロード時は保存しない（無限ループを防ぐ）
+    const isInitialLoad = entries.length === 0;
+    if (isInitialLoad) return;
+    
     const saveProfile = async () => {
       try {
         await saveUserProfile(profile);
       } catch (error) {
         console.error('Error saving profile:', error);
-        // Fallback to localStorage
-        localStorage.setItem('ai_diary_profile', JSON.stringify(profile));
       }
     };
     
@@ -264,8 +233,7 @@ const App: React.FC = () => {
         await saveDiaryEntry(newEntry);
       } catch (error) {
         console.error('Error saving diary entry:', error);
-        // Fallback to localStorage
-        localStorage.setItem('ai_diary_entries', JSON.stringify(updatedEntries));
+        // エラーをユーザーに通知しない（バックグラウンドで保存を試みる）
       }
 
       // Check for milestone (10, 20, 30, 40, 50, ...)

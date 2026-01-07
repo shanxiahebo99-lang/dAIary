@@ -52,13 +52,8 @@ export const saveUserProfile = async (profile: UserProfile): Promise<void> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  // プロフィール画像がBase64で大きすぎる場合は圧縮または警告
-  let profilePicture = profile.profilePicture || null;
-  if (profilePicture && profilePicture.length > 1000000) { // 1MB以上の場合
-    console.warn('Profile picture is too large, may cause issues');
-    // Base64画像を圧縮するか、サイズを制限する
-    // ここでは警告のみで、保存は試みます
-  }
+  // プロフィール画像（サイズ制限なし）
+  const profilePicture = profile.profilePicture || null;
 
   const { error } = await supabase
     .from('user_profiles')

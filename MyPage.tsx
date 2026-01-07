@@ -21,6 +21,7 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
   const [customInstruction, setCustomInstruction] = useState<string>(profile.customInstruction || '');
   const [profilePicture, setProfilePicture] = useState<string | undefined>(profile.profilePicture);
   const [nickname, setNickname] = useState<string>(profile.nickname || '');
+  const [userName, setUserName] = useState<string>(profile.name || '');
   const [isLoading, setIsLoading] = useState(false);
   const [emailCodeSent, setEmailCodeSent] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -42,6 +43,7 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
     setPersonality(profile.personality);
     setCustomInstruction(profile.customInstruction || '');
     setNickname(profile.nickname || '');
+    setUserName(profile.name || '');
     setProfilePicture(profile.profilePicture);
   }, [profile]);
 
@@ -149,49 +151,17 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
     }
   };
 
-  const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePictureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) { // 2MBに制限
-      setMessage({ type: 'error', text: '画像サイズは2MB以下である必要があります' });
-      return;
-    }
-
-    setIsLoading(true);
-    setMessage(null);
-
     const reader = new FileReader();
-    reader.onloadend = async () => {
-      try {
-        const base64 = reader.result as string;
-        
-        // Base64画像を圧縮（オプション）
-        // ここではそのまま使用しますが、必要に応じて圧縮できます
-        
-        setProfilePicture(base64);
-        const updatedProfile = { ...profile, profilePicture: base64 };
-        onProfileUpdate(updatedProfile);
-        
-        try {
-          await saveUserProfile(updatedProfile);
-          setMessage({ type: 'success', text: 'プロフィール画像を更新しました' });
-        } catch (error: any) {
-          console.error('Error saving profile picture:', error);
-          setMessage({ 
-            type: 'error', 
-            text: `プロフィール画像の保存に失敗しました: ${error.message || '不明なエラー'}` 
-          });
-        }
-      } catch (error: any) {
-        setMessage({ type: 'error', text: `画像の読み込みに失敗しました: ${error.message}` });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    reader.onerror = () => {
-      setMessage({ type: 'error', text: '画像の読み込みに失敗しました' });
-      setIsLoading(false);
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setProfilePicture(base64);
+      const updatedProfile = { ...profile, profilePicture: base64 };
+      onProfileUpdate(updatedProfile);
+      setMessage({ type: 'success', text: 'プロフィール画像を更新しました' });
     };
     reader.readAsDataURL(file);
   };
@@ -204,6 +174,21 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
       setMessage({ type: 'success', text: 'ニックネームを更新しました' });
     } catch (error) {
       setMessage({ type: 'error', text: 'ニックネームの保存に失敗しました' });
+    }
+  };
+
+  const handleUserNameUpdate = async () => {
+    if (!userName.trim()) {
+      setMessage({ type: 'error', text: 'ユーザー名を入力してください' });
+      return;
+    }
+    const updatedProfile = { ...profile, name: userName.trim() };
+    onProfileUpdate(updatedProfile);
+    try {
+      await saveUserProfile(updatedProfile);
+      setMessage({ type: 'success', text: 'ユーザー名を更新しました' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'ユーザー名の保存に失敗しました' });
     }
   };
 
@@ -311,20 +296,26 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
         </div>
       )}
 
-      {/* User Info */}
+      {/* User Name */}
       <div className="glass-card-strong p-6">
-        <h3 className="font-semibold text-gray-800 mb-4">ユーザー情報</h3>
-        <div className="space-y-2">
-          <div>
-            <span className="text-sm text-gray-600">名前: </span>
-            <span className="font-medium text-gray-800">{profile.name}</span>
-          </div>
-          {profile.nickname && (
-            <div>
-              <span className="text-sm text-gray-600">ニックネーム: </span>
-              <span className="font-medium text-gray-800">{profile.nickname}</span>
-            </div>
-          )}
+        <h3 className="font-semibold text-gray-800 mb-4">ユーザー名</h3>
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+            className="login-input w-full"
+            placeholder="ユーザー名を入力"
+            disabled={isLoading}
+            maxLength={50}
+          />
+          <button
+            onClick={handleUserNameUpdate}
+            disabled={isLoading || userName.trim() === profile.name || !userName.trim()}
+            className="modern-button w-full"
+          >
+            {isLoading ? '更新中...' : 'ユーザー名を更新'}
+          </button>
         </div>
       </div>
 
