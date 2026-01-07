@@ -52,6 +52,14 @@ export const saveUserProfile = async (profile: UserProfile): Promise<void> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
+  // プロフィール画像がBase64で大きすぎる場合は圧縮または警告
+  let profilePicture = profile.profilePicture || null;
+  if (profilePicture && profilePicture.length > 1000000) { // 1MB以上の場合
+    console.warn('Profile picture is too large, may cause issues');
+    // Base64画像を圧縮するか、サイズを制限する
+    // ここでは警告のみで、保存は試みます
+  }
+
   const { error } = await supabase
     .from('user_profiles')
     .upsert({
@@ -59,14 +67,17 @@ export const saveUserProfile = async (profile: UserProfile): Promise<void> => {
       name: profile.name,
       nickname: profile.nickname || null,
       personality: profile.personality,
-      profile_picture: profile.profilePicture || null,
+      profile_picture: profilePicture,
       custom_instruction: profile.customInstruction || null,
       updated_at: new Date().toISOString(),
     }, {
       onConflict: 'user_id',
     });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error saving profile:', error);
+    throw error;
+  }
 };
 
 // ユーザープロフィールを取得

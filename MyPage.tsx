@@ -153,23 +153,45 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage({ type: 'error', text: '画像サイズは5MB以下である必要があります' });
+    if (file.size > 2 * 1024 * 1024) { // 2MBに制限
+      setMessage({ type: 'error', text: '画像サイズは2MB以下である必要があります' });
       return;
     }
 
+    setIsLoading(true);
+    setMessage(null);
+
     const reader = new FileReader();
     reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      setProfilePicture(base64);
-      const updatedProfile = { ...profile, profilePicture: base64 };
-      onProfileUpdate(updatedProfile);
       try {
-        await saveUserProfile(updatedProfile);
-        setMessage({ type: 'success', text: 'プロフィール画像を更新しました' });
-      } catch (error) {
-        setMessage({ type: 'error', text: 'プロフィール画像の保存に失敗しました' });
+        const base64 = reader.result as string;
+        
+        // Base64画像を圧縮（オプション）
+        // ここではそのまま使用しますが、必要に応じて圧縮できます
+        
+        setProfilePicture(base64);
+        const updatedProfile = { ...profile, profilePicture: base64 };
+        onProfileUpdate(updatedProfile);
+        
+        try {
+          await saveUserProfile(updatedProfile);
+          setMessage({ type: 'success', text: 'プロフィール画像を更新しました' });
+        } catch (error: any) {
+          console.error('Error saving profile picture:', error);
+          setMessage({ 
+            type: 'error', 
+            text: `プロフィール画像の保存に失敗しました: ${error.message || '不明なエラー'}` 
+          });
+        }
+      } catch (error: any) {
+        setMessage({ type: 'error', text: `画像の読み込みに失敗しました: ${error.message}` });
+      } finally {
+        setIsLoading(false);
       }
+    };
+    reader.onerror = () => {
+      setMessage({ type: 'error', text: '画像の読み込みに失敗しました' });
+      setIsLoading(false);
     };
     reader.readAsDataURL(file);
   };
@@ -288,6 +310,23 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
           </p>
         </div>
       )}
+
+      {/* User Info */}
+      <div className="glass-card-strong p-6">
+        <h3 className="font-semibold text-gray-800 mb-4">ユーザー情報</h3>
+        <div className="space-y-2">
+          <div>
+            <span className="text-sm text-gray-600">名前: </span>
+            <span className="font-medium text-gray-800">{profile.name}</span>
+          </div>
+          {profile.nickname && (
+            <div>
+              <span className="text-sm text-gray-600">ニックネーム: </span>
+              <span className="font-medium text-gray-800">{profile.nickname}</span>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Statistics */}
       <div className="glass-card-strong p-6">

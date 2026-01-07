@@ -76,20 +76,60 @@ const App: React.FC = () => {
       try {
         // Load entries from Supabase
         const loadedEntries = await getDiaryEntries();
-        setEntries(loadedEntries);
+        // Supabaseにデータがある場合のみ更新（空の場合は既存データを保持）
+        if (loadedEntries.length > 0) {
+          setEntries(loadedEntries);
+        } else {
+          // Supabaseが空の場合はlocalStorageから読み込む（初回移行時）
+          const savedEntries = localStorage.getItem('ai_diary_entries');
+          if (savedEntries) {
+            const parsedEntries = JSON.parse(savedEntries);
+            if (parsedEntries.length > 0) {
+              setEntries(parsedEntries);
+              // localStorageのデータをSupabaseに移行
+              for (const entry of parsedEntries) {
+                try {
+                  await saveDiaryEntry(entry);
+                } catch (err) {
+                  console.error('Error migrating entry:', err);
+                }
+              }
+            }
+          }
+        }
         
         // Load profile from Supabase
         const loadedProfile = await getUserProfile();
         if (loadedProfile) {
           setProfile(loadedProfile);
+        } else {
+          // Supabaseにプロフィールがない場合はlocalStorageから読み込む
+          const savedProfile = localStorage.getItem('ai_diary_profile');
+          if (savedProfile) {
+            const parsedProfile = JSON.parse(savedProfile);
+            setProfile(parsedProfile);
+            // localStorageのデータをSupabaseに移行
+            try {
+              await saveUserProfile(parsedProfile);
+            } catch (err) {
+              console.error('Error migrating profile:', err);
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading data:', error);
         // Fallback to localStorage if Supabase fails
         const savedEntries = localStorage.getItem('ai_diary_entries');
         const savedProfile = localStorage.getItem('ai_diary_profile');
-        if (savedEntries) setEntries(JSON.parse(savedEntries));
-        if (savedProfile) setProfile(JSON.parse(savedProfile));
+        if (savedEntries) {
+          const parsedEntries = JSON.parse(savedEntries);
+          if (parsedEntries.length > 0) {
+            setEntries(parsedEntries);
+          }
+        }
+        if (savedProfile) {
+          setProfile(JSON.parse(savedProfile));
+        }
       }
     };
     
