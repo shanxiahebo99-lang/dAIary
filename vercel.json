@@ -1,7 +1,7 @@
 {
   "functions": {
-    "api/ai/*.ts": {
-      "runtime": "nodejs20.x"
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@3.2.22"
     }
   }
 }
