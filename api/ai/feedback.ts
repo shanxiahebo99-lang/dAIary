@@ -47,7 +47,7 @@ export default async function handler(req: Request) {
   console.log('GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✅ 設定済み' : '❌ 未設定');
   console.log('GEMINI_MODEL:', process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp (デフォルト)');
   console.log('📥 リクエスト受信:', req.method, req.url);
-  console.log('📥 リクエストヘッダー:', Object.fromEntries(req.headers.entries()));
+  console.log('📥 リクエストヘッダー:', { ...req.headers });
 
   try {
     const { content, personality, customInstruction } = await req.json();
