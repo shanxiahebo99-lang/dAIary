@@ -85,8 +85,20 @@ export const saveUserProfile = async (profile: UserProfile): Promise<void> => {
 
 // ユーザープロフィールを取得
 export const getUserProfile = async (): Promise<UserProfile | null> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  console.log('🔍 getUserProfile: Starting...');
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError) {
+    console.error('❌ getUserProfile: Error getting user:', userError);
+    return null;
+  }
+  
+  if (!user) {
+    console.log('🔍 getUserProfile: No user found');
+    return null;
+  }
+  
+  console.log('🔍 getUserProfile: User ID =', user.id);
 
   let { data, error } = await supabase
     .from('user_profiles')
@@ -94,8 +106,23 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     .eq('user_id', user.id)
     .single();
 
+  console.log('🔍 getUserProfile: Query result - data exists?', !!data, 'error?', !!error, 'error code?', error?.code);
+
+  // PGRST205エラー: テーブルがスキーマキャッシュに見つからない
+  if (error && error.code === 'PGRST205') {
+    console.error('❌ getUserProfile: CRITICAL - Table "user_profiles" not found in schema cache!');
+    console.error('❌ This means the table does not exist or PostgREST cache needs refresh.');
+    console.error('❌ Please check:');
+    console.error('   1. Run supabase_schema.sql in Supabase SQL Editor');
+    console.error('   2. Refresh PostgREST schema cache in Supabase Dashboard');
+    console.error('   3. Verify table exists: SELECT * FROM user_profiles LIMIT 1;');
+    // このエラーは致命的なので、nullを返す
+    return null;
+  }
+
   // プロフィールが存在しない場合は自動的に作成
   if (error && error.code === 'PGRST116') {
+    console.log('🔍 getUserProfile: Profile not found (404), creating new profile...');
     const defaultName = user.email?.split('@')[0] || 'ユーザー';
     const { data: newProfile, error: insertError } = await supabase
       .from('user_profiles')
@@ -109,7 +136,8 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
       .single();
 
     if (insertError) {
-      console.error('Error creating user profile:', insertError);
+      console.error('❌ getUserProfile: Error creating user profile:', insertError);
+      console.error('❌ Insert error details:', { code: insertError.code, message: insertError.message, details: insertError });
       // 作成に失敗した場合はデフォルト値を返す
       return {
         name: defaultName,
@@ -118,21 +146,26 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
       };
     }
 
+    console.log('✅ getUserProfile: Profile created successfully');
     data = newProfile;
   } else if (error) {
-    console.error('Error fetching user profile:', error);
+    console.error('❌ getUserProfile: Error fetching user profile:', error);
+    console.error('❌ Error details:', { code: error.code, message: error.message, details: error });
     return null;
   }
 
   // アカウントが削除されている場合はnullを返す
   if (data && data.is_deleted) {
+    console.log('🔍 getUserProfile: Account is deleted');
     return null;
   }
 
   if (!data) {
+    console.log('🔍 getUserProfile: No data returned');
     return null;
   }
 
+  console.log('✅ getUserProfile: Profile loaded successfully:', { name: data.name, hasNickname: !!data.nickname });
   return {
     name: data.name || user.email?.split('@')[0] || 'ユーザー',
     nickname: data.nickname || undefined,

@@ -44,15 +44,21 @@ export default function Login() {
   };
 
   const handleSignUp = async () => {
+    console.log('🔍 handleSignUp: Starting signup...', { email, passwordLength: password.length });
     setIsLoading(true);
     setError('');
     try {
-      const { error: authError } = await signUp(email, password);
+      const { data, error: authError } = await signUp(email, password);
       if (authError) {
+        console.error('❌ handleSignUp: Signup error:', authError);
         setError(authError.message);
+      } else {
+        console.log('✅ handleSignUp: Signup successful:', data);
+        // 新規登録成功時は自動的にログインされる
       }
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ handleSignUp: Signup exception:', err);
+      setError(err.message || '新規登録に失敗しました。');
     } finally {
       setIsLoading(false);
     }
@@ -117,7 +123,10 @@ export default function Login() {
 
           {!showSignUp && (
             <button
-              onClick={() => setShowSignUp(true)}
+              onClick={() => {
+                console.log('🔍 新規登録はこちら: Button clicked, setting showSignUp to true');
+                setShowSignUp(true);
+              }}
               disabled={isLoading || !email || !password}
               className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
             >
@@ -127,7 +136,10 @@ export default function Login() {
 
           {showSignUp && (
             <button
-              onClick={handleSignUp}
+              onClick={() => {
+                console.log('🔍 新規登録ボタン: Button clicked, calling handleSignUp');
+                handleSignUp();
+              }}
               disabled={isLoading || !email || !password}
               className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
             >
