@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile } from './types';
 import { supabase } from './supabase';
 import { signOut } from './auth';
-import { saveUserProfile } from './supabaseService';
+import { saveUserProfile, deleteUserAccount, deleteAllDiaryEntries } from './supabaseService';
 
 interface MyPageProps {
   profile: UserProfile;
@@ -27,6 +27,7 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [user, setUser] = useState<any>(null);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [showDeleteDiaryData, setShowDeleteDiaryData] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
 
   useEffect(() => {
@@ -206,37 +207,11 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
     setMessage(null);
 
     try {
-      // パスワードで再認証
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: currentEmail,
-        password: deletePassword,
-      });
-
-      if (signInError) {
-        throw new Error('パスワードが正しくありません');
-      }
-
-      // 日記エントリを削除
-      const { error: entriesError } = await supabase
-        .from('diary_entries')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (entriesError) console.error('Error deleting entries:', entriesError);
-
-      // プロフィールを削除
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (profileError) console.error('Error deleting profile:', profileError);
-
-      // データ削除が完了したら、ログアウトしてアカウントを無効化
-      // 注意: Supabaseのauthユーザー自体は削除できませんが、すべてのデータは削除されています
+      await deleteUserAccount(deletePassword);
+      
       setMessage({ 
         type: 'success', 
-        text: 'アカウントのデータを削除しました。ログアウトします。' 
+        text: 'アカウントを削除しました。ログアウトします。' 
       });
       
       // 少し待ってからログアウト
@@ -248,6 +223,40 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
     } finally {
       setIsLoading(false);
       setShowDeleteAccount(false);
+      setDeletePassword('');
+    }
+  };
+
+  const handleDeleteDiaryData = async () => {
+    if (!deletePassword) {
+      setMessage({ type: 'error', text: 'パスワードを入力してください' });
+      return;
+    }
+
+    if (!confirm('本当にすべての日記データを削除しますか？この操作は取り消せません。')) {
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      await deleteAllDiaryEntries(deletePassword);
+      
+      setMessage({ 
+        type: 'success', 
+        text: 'すべての日記データを削除しました。' 
+      });
+      
+      // ページをリロードしてデータを更新
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message || '日記データの削除に失敗しました' });
+    } finally {
+      setIsLoading(false);
+      setShowDeleteDiaryData(false);
       setDeletePassword('');
     }
   };
@@ -504,6 +513,20 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
             </p>
           </div>
         )}
+      </div>
+
+      {/* Delete Diary Data */}
+      <div className="glass-card-strong p-6">
+        <h3 className="font-semibold text-gray-800 mb-4">日記データの削除</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          すべての日記データを削除します。プロフィール情報は残ります。
+        </p>
+        <button
+          onClick={() => setShowDeleteDiaryData(true)}
+          className="w-full bg-orange-500 bg-opacity-80 hover:bg-opacity-100 text-white py-3 rounded-xl font-semibold transition-all duration-300"
+        >
+          日記データを削除
+        </button>
       </div>
 
       {/* Logout Button */}

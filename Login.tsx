@@ -7,6 +7,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [rememberEmail, setRememberEmail] = useState(false);
+  const [showSignUp, setShowSignUp] = useState(false);
 
   // Load saved email from localStorage
   useEffect(() => {
@@ -114,13 +115,25 @@ export default function Login() {
             {isLoading ? 'ログイン中...' : 'ログイン'}
           </button>
 
-          <button
-            onClick={handleSignUp}
-            disabled={isLoading || !email || !password}
-            className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
-          >
-            {isLoading ? '作成中...' : '新規登録'}
-          </button>
+          {!showSignUp && (
+            <button
+              onClick={() => setShowSignUp(true)}
+              disabled={isLoading || !email || !password}
+              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
+            >
+              新規登録はこちら
+            </button>
+          )}
+
+          {showSignUp && (
+            <button
+              onClick={handleSignUp}
+              disabled={isLoading || !email || !password}
+              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
+            >
+              {isLoading ? '作成中...' : '新規登録'}
+            </button>
+          )}
         </div>
       </div>
     </div>

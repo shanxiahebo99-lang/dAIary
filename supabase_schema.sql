@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   personality TEXT NOT NULL DEFAULT 'supportive' CHECK (personality IN ('supportive', 'strict', 'philosophical', 'custom')),
   profile_picture TEXT,
   custom_instruction TEXT,
+  is_deleted BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -71,6 +71,7 @@ export const saveUserProfile = async (profile: UserProfile): Promise<void> => {
       personality: profile.personality,
       profile_picture: profilePicture,
       custom_instruction: profile.customInstruction || null,
+      is_deleted: false,
       updated_at: new Date().toISOString(),
     }, {
       onConflict: 'user_id',
@@ -106,6 +107,11 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     return null;
   }
 
+  // アカウントが削除されている場合はnullを返す
+  if (data.is_deleted) {
+    return null;
+  }
+
   return {
     name: data.name || user.email?.split('@')[0] || 'ユーザー',
     nickname: data.nickname || undefined,
@@ -113,6 +119,62 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     profilePicture: data.profile_picture || undefined,
     customInstruction: data.custom_instruction || undefined,
   };
+};
+
+// アカウントを削除（削除フラグを設定）
+export const deleteUserAccount = async (password: string): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !user.email) throw new Error('User not authenticated');
+
+  // パスワードで再認証
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: password,
+  });
+
+  if (signInError) {
+    throw new Error('パスワードが正しくありません');
+  }
+
+  // 日記エントリを削除
+  const { error: entriesError } = await supabase
+    .from('diary_entries')
+    .delete()
+    .eq('user_id', user.id);
+
+  if (entriesError) throw entriesError;
+
+  // プロフィールに削除フラグを設定
+  const { error: profileError } = await supabase
+    .from('user_profiles')
+    .update({ is_deleted: true })
+    .eq('user_id', user.id);
+
+  if (profileError) throw profileError;
+};
+
+// 日記データをすべて削除
+export const deleteAllDiaryEntries = async (password: string): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !user.email) throw new Error('User not authenticated');
+
+  // パスワードで再認証
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: password,
+  });
+
+  if (signInError) {
+    throw new Error('パスワードが正しくありません');
+  }
+
+  // 日記エントリをすべて削除
+  const { error: entriesError } = await supabase
+    .from('diary_entries')
+    .delete()
+    .eq('user_id', user.id);
+
+  if (entriesError) throw entriesError;
 };
 
 // 日記エントリを削除

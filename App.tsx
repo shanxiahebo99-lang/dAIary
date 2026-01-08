@@ -57,10 +57,41 @@ const App: React.FC = () => {
 
   /* ---------------- 認証 ---------------- */
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setIsAuthenticated(!!data.session);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // プロフィールをチェックして、削除されていないか確認
+        try {
+          const profile = await getUserProfile();
+          if (!profile) {
+            // アカウントが削除されている場合はログアウト
+            await supabase.auth.signOut();
+            setIsAuthenticated(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking profile:', error);
+        }
+      }
+      setIsAuthenticated(!!session);
+    };
+    
+    checkAuth();
+    
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_e, s) => {
+      if (s) {
+        // ログイン時にもプロフィールをチェック
+        try {
+          const profile = await getUserProfile();
+          if (!profile) {
+            await supabase.auth.signOut();
+            setIsAuthenticated(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking profile:', error);
+        }
+      }
       setIsAuthenticated(!!s);
     });
     return () => {
@@ -70,9 +101,9 @@ const App: React.FC = () => {
 
   /* ---------------- Load data from Supabase ---------------- */
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     const loadData = async () => {
-      if (!isAuthenticated) return;
-      
       try {
         // 常にSupabaseからデータを読み込む（アカウントごとに同期）
         const loadedEntries = await getDiaryEntries();
@@ -93,6 +124,63 @@ const App: React.FC = () => {
     };
     
     loadData();
+    
+    // リアルタイム同期を設定
+    const setupRealtime = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // 日記エントリの変更を監視
+        const entriesChannel = supabase
+          .channel('diary_entries_changes')
+          .on('postgres_changes', 
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'diary_entries',
+              filter: `user_id=eq.${user.id}`
+            }, 
+            async () => {
+              // データが変更されたら再読み込み
+              const loadedEntries = await getDiaryEntries();
+              setEntries(loadedEntries);
+            }
+          )
+          .subscribe();
+
+        // プロフィールの変更を監視
+        const profileChannel = supabase
+          .channel('user_profiles_changes')
+          .on('postgres_changes', 
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'user_profiles',
+              filter: `user_id=eq.${user.id}`
+            }, 
+            async () => {
+              // プロフィールが変更されたら再読み込み
+              const loadedProfile = await getUserProfile();
+              if (loadedProfile) {
+                setProfile(loadedProfile);
+              }
+            }
+          )
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(entriesChannel);
+          supabase.removeChannel(profileChannel);
+        };
+      }
+    };
+    
+    const cleanup = setupRealtime();
+    
+    return () => {
+      cleanup.then((cleanupFn) => {
+        if (cleanupFn) cleanupFn();
+      });
+    };
   }, [isAuthenticated]);
 
   /* ---------------- Save profile to Supabase ---------------- */
