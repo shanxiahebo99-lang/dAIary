@@ -27,32 +27,82 @@ export default function Login() {
   useEffect(() => {
     const checkAuthCallback = async () => {
       // URLハッシュから認証情報を取得
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const type = hashParams.get('type');
-
-      if (accessToken && type === 'signup') {
-        // 認証URLをクリックした場合
-        console.log('🔍 checkAuthCallback: Auth URL clicked, type =', type);
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (session) {
-          console.log('✅ checkAuthCallback: Session found, showing password setup');
-          setShowSetPassword(true);
-          setEmail(session.user.email || '');
-          // URLハッシュをクリア
-          window.history.replaceState(null, '', window.location.pathname);
-        }
-      } else {
-        // 通常のセッションチェック
+      const hash = window.location.hash;
+      if (!hash) {
+        // ハッシュがない場合は通常のセッションチェック
         const { data: { session } } = await supabase.auth.getSession();
         if (session && session.user && !session.user.user_metadata?.has_password) {
           // パスワードが設定されていない場合は、パスワード設定画面を表示
           setShowSetPassword(true);
           setEmail(session.user.email || '');
         }
+        return;
+      }
+
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const type = hashParams.get('type');
+      const error = hashParams.get('error');
+      const errorDescription = hashParams.get('error_description');
+
+      // エラーがある場合
+      if (error) {
+        console.error('❌ checkAuthCallback: Auth error:', error, errorDescription);
+        setError(errorDescription || '認証に失敗しました。もう一度お試しください。');
+        // URLハッシュをクリア
+        window.history.replaceState(null, '', window.location.pathname);
+        return;
+      }
+
+      if (accessToken) {
+        // 認証URLをクリックした場合
+        console.log('🔍 checkAuthCallback: Auth URL clicked, type =', type);
+        
+        // SupabaseがURLハッシュを処理するまで少し待機
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // セッションを取得
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('❌ checkAuthCallback: Session error:', sessionError);
+          setError(sessionError.message || 'セッションの取得に失敗しました');
+          window.history.replaceState(null, '', window.location.pathname);
+          return;
+        }
+
+        if (session) {
+          console.log('✅ checkAuthCallback: Session found, showing password setup');
+          setShowSetPassword(true);
+          setEmail(session.user.email || '');
+          // URLハッシュをクリア
+          window.history.replaceState(null, '', window.location.pathname);
+        } else {
+          console.error('❌ checkAuthCallback: No session found after auth URL click');
+          setError('認証に失敗しました。もう一度お試しください。');
+          window.history.replaceState(null, '', window.location.pathname);
+        }
       }
     };
     checkAuthCallback();
+
+    // onAuthStateChangeイベントをリッスン
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔍 onAuthStateChange in Login:', event, 'Session exists?', !!session);
+      
+      if (event === 'SIGNED_IN' && session) {
+        // パスワードが設定されていない場合は、パスワード設定画面を表示
+        if (!session.user.user_metadata?.has_password) {
+          console.log('✅ onAuthStateChange: User signed in without password, showing password setup');
+          setShowSetPassword(true);
+          setEmail(session.user.email || '');
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSignIn = async () => {
