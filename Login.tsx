@@ -55,32 +55,38 @@ export default function Login() {
       }
 
       if (accessToken) {
-        // 認証URLをクリックした場合
-        console.log('🔍 checkAuthCallback: Auth URL clicked, type =', type);
+        // 認証URLをクリックした場合（typeは'signup'、'magiclink'、'email'など）
+        console.log('🔍 checkAuthCallback: Auth URL clicked, type =', type, 'access_token exists');
         
-        // SupabaseがURLハッシュを処理するまで少し待機
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // URLハッシュを即座にクリア（App.tsxの処理と競合しないように）
+        window.history.replaceState(null, '', window.location.pathname);
         
-        // セッションを取得
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('❌ checkAuthCallback: Session error:', sessionError);
-          setError(sessionError.message || 'セッションの取得に失敗しました');
-          window.history.replaceState(null, '', window.location.pathname);
-          return;
+        // SupabaseがURLハッシュを処理するまで待機（複数回試行）
+        let session = null;
+        for (let i = 0; i < 5; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error('❌ checkAuthCallback: Session error:', sessionError);
+            setError(sessionError.message || 'セッションの取得に失敗しました');
+            return;
+          }
+
+          if (currentSession) {
+            session = currentSession;
+            console.log(`✅ checkAuthCallback: Session found after ${i + 1} attempts`);
+            break;
+          }
         }
 
         if (session) {
           console.log('✅ checkAuthCallback: Session found, showing password setup');
           setShowSetPassword(true);
           setEmail(session.user.email || '');
-          // URLハッシュをクリア
-          window.history.replaceState(null, '', window.location.pathname);
         } else {
           console.error('❌ checkAuthCallback: No session found after auth URL click');
           setError('認証に失敗しました。もう一度お試しください。');
-          window.history.replaceState(null, '', window.location.pathname);
         }
       }
     };
@@ -90,9 +96,13 @@ export default function Login() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔍 onAuthStateChange in Login:', event, 'Session exists?', !!session);
       
-      if (event === 'SIGNED_IN' && session) {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
         // パスワードが設定されていない場合は、パスワード設定画面を表示
-        if (!session.user.user_metadata?.has_password) {
+        // 新規登録ユーザーは通常パスワードが設定されていない
+        const hasPassword = session.user.user_metadata?.has_password || 
+                           session.user.app_metadata?.has_password;
+        
+        if (!hasPassword) {
           console.log('✅ onAuthStateChange: User signed in without password, showing password setup');
           setShowSetPassword(true);
           setEmail(session.user.email || '');

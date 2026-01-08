@@ -105,6 +105,16 @@ const App: React.FC = () => {
           return;
         }
         
+        // 新規登録ユーザー（パスワード未設定）の場合は、ログイン画面を表示し続ける
+        const hasPassword = refreshedSession.user.user_metadata?.has_password || 
+                           refreshedSession.user.app_metadata?.has_password;
+        
+        if (!hasPassword) {
+          console.log('🔍 onAuthStateChange: New user without password, keeping login screen');
+          setIsAuthenticated(false); // ログイン画面を表示し続ける
+          return;
+        }
+        
         // プロフィールをチェック
         try {
           console.log('🔍 onAuthStateChange: Fetching profile after SIGNED_IN...');
