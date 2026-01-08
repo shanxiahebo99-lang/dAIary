@@ -7,10 +7,13 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [rememberEmail, setRememberEmail] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
-  const [showVerificationCode, setShowVerificationCode] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
+  const [showSignUpEmail, setShowSignUpEmail] = useState(false);
+  const [showSetPassword, setShowSetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Load saved email from localStorage
   useEffect(() => {
@@ -19,6 +22,38 @@ export default function Login() {
       setEmail(savedEmail);
       setRememberEmail(true);
     }
+  }, []);
+
+  // 認証URLをクリックした後の処理を確認
+  useEffect(() => {
+    const checkAuthCallback = async () => {
+      // URLハッシュから認証情報を取得
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const type = hashParams.get('type');
+
+      if (accessToken && type === 'signup') {
+        // 認証URLをクリックした場合
+        console.log('🔍 checkAuthCallback: Auth URL clicked, type =', type);
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (session) {
+          console.log('✅ checkAuthCallback: Session found, showing password setup');
+          setShowSetPassword(true);
+          setEmail(session.user.email || '');
+          // URLハッシュをクリア
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      } else {
+        // 通常のセッションチェック
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user && !session.user.user_metadata?.has_password) {
+          // パスワードが設定されていない場合は、パスワード設定画面を表示
+          setShowSetPassword(true);
+          setEmail(session.user.email || '');
+        }
+      }
+    };
+    checkAuthCallback();
   }, []);
 
   const handleSignIn = async () => {
@@ -52,96 +87,115 @@ export default function Login() {
     }
   };
 
-  const handleSignUp = async () => {
-    console.log('🔍 handleSignUp: Starting signup...', { email, passwordLength: password.length });
-    setIsLoading(true);
-    setError('');
-    try {
-      const { data, error: authError } = await signUp(email, password);
-      if (authError) {
-        console.error('❌ handleSignUp: Signup error:', authError);
-        setError(authError.message);
-      } else {
-        console.log('✅ handleSignUp: Signup successful:', data);
-        // セッションがnullの場合はメール確認が必要
-        if (!data.session) {
-          console.log('🔍 handleSignUp: Session is null, showing verification code input');
-          setShowVerificationCode(true);
-          setError('');
-        }
-        // セッションがある場合は自動的にログインされる
-      }
-    } catch (err: any) {
-      console.error('❌ handleSignUp: Signup exception:', err);
-      setError(err.message || '新規登録に失敗しました。');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    if (!verificationCode || verificationCode.length < 6) {
-      setError('確認コードを正しく入力してください（6桁）');
+  // 新規登録：メールアドレスを送信
+  const handleSendSignUpEmail = async () => {
+    if (!email) {
+      setError('メールアドレスを入力してください');
       return;
     }
 
     setIsLoading(true);
     setError('');
+    setSuccessMessage('');
 
     try {
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      console.log('🔍 handleSendSignUpEmail: Sending signup email to', email);
+      const { error: otpError } = await supabase.auth.signInWithOtp({
         email,
-        token: verificationCode,
-        type: 'signup',
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: window.location.origin,
+        },
       });
 
-      if (verifyError) {
-        console.error('❌ handleVerifyCode: Verification error:', verifyError);
-        setError(verifyError.message || '確認コードが正しくありません');
+      if (otpError) {
+        console.error('❌ handleSendSignUpEmail: Error:', otpError);
+        setError(otpError.message || 'メールの送信に失敗しました');
       } else {
-        console.log('✅ handleVerifyCode: Verification successful:', data);
-        setShowVerificationCode(false);
-        setVerificationCode('');
-        setError('');
-        // 確認成功後は自動的にログインされる
+        console.log('✅ handleSendSignUpEmail: Email sent successfully');
+        setSuccessMessage(`${email} に認証メールを送信しました。メール内のリンクをクリックして認証を完了してください。`);
+        setShowSignUpEmail(false);
       }
     } catch (err: any) {
-      console.error('❌ handleVerifyCode: Verification exception:', err);
-      setError(err.message || '確認コードの検証に失敗しました');
+      console.error('❌ handleSendSignUpEmail: Exception:', err);
+      setError(err.message || 'メールの送信に失敗しました');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResendCode = async () => {
+  // パスワードを設定
+  const handleSetPassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      setError('パスワードは6文字以上で入力してください');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('パスワードが一致しません');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
+    setSuccessMessage('');
 
     try {
-      console.log('🔍 handleResendCode: Resending verification code to', email);
-      // 確認コードを再送信（signupの場合は再度signUpを呼び出す）
-      const { data, error: resendError } = await supabase.auth.resend({
-        type: 'signup',
-        email: email,
+      console.log('🔍 handleSetPassword: Setting password...');
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
       });
 
-      if (resendError) {
-        console.error('❌ handleResendCode: Resend error:', resendError);
-        // resendが失敗した場合は、再度signUpを試みる
-        const { error: signUpError } = await signUp(email, password);
-        if (signUpError) {
-          setError(signUpError.message || '確認コードの再送に失敗しました');
-        } else {
-          setError('');
-          // 成功メッセージを表示（エラーがない場合は既に表示されている）
-        }
+      if (updateError) {
+        console.error('❌ handleSetPassword: Error:', updateError);
+        setError(updateError.message || 'パスワードの設定に失敗しました');
       } else {
-        console.log('✅ handleResendCode: Code resent successfully');
-        setError('');
+        console.log('✅ handleSetPassword: Password set successfully');
+        setSuccessMessage('パスワードを設定しました。ログインできます。');
+        setShowSetPassword(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        // パスワード設定後は自動的にログインされる
       }
     } catch (err: any) {
-      console.error('❌ handleResendCode: Resend exception:', err);
-      setError(err.message || '確認コードの再送に失敗しました');
+      console.error('❌ handleSetPassword: Exception:', err);
+      setError(err.message || 'パスワードの設定に失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 認証メールを再送信
+  const handleResendSignUpEmail = async () => {
+    if (!email) {
+      setError('メールアドレスを入力してください');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      console.log('🔍 handleResendSignUpEmail: Resending signup email to', email);
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: window.location.origin,
+        },
+      });
+
+      if (otpError) {
+        console.error('❌ handleResendSignUpEmail: Error:', otpError);
+        setError(otpError.message || 'メールの再送に失敗しました');
+      } else {
+        console.log('✅ handleResendSignUpEmail: Email resent successfully');
+        setSuccessMessage(`${email} に認証メールを再送信しました。`);
+      }
+    } catch (err: any) {
+      console.error('❌ handleResendSignUpEmail: Exception:', err);
+      setError(err.message || 'メールの再送に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -166,7 +220,112 @@ export default function Login() {
           </div>
         )}
 
-        {showVerificationCode ? (
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 text-sm">
+            {successMessage}
+          </div>
+        )}
+
+        {showSetPassword ? (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 text-sm">
+              <p className="font-semibold mb-2">パスワードを設定してください</p>
+              <p>メールアドレスの認証が完了しました。ログインに使用するパスワードを設定してください。</p>
+            </div>
+
+            <input
+              type="password"
+              placeholder="パスワード（6文字以上）"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              disabled={isLoading}
+              className="login-input w-full"
+            />
+
+            <input
+              type="password"
+              placeholder="パスワード（確認）"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={isLoading}
+              className="login-input w-full"
+            />
+
+            <button
+              onClick={handleSetPassword}
+              disabled={isLoading || !newPassword || newPassword.length < 6 || newPassword !== confirmPassword}
+              className="modern-button w-full"
+            >
+              {isLoading ? '設定中...' : 'パスワードを設定'}
+            </button>
+          </div>
+        ) : showSignUpEmail ? (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 text-sm">
+              <p className="font-semibold mb-2">新規登録</p>
+              <p>メールアドレスを入力してください。認証メールを送信します。</p>
+            </div>
+
+            <input
+              type="email"
+              placeholder="メールアドレス"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
+              className="login-input w-full"
+            />
+
+            <button
+              onClick={handleSendSignUpEmail}
+              disabled={isLoading || !email}
+              className="modern-button w-full"
+            >
+              {isLoading ? '送信中...' : '認証メールを送信'}
+            </button>
+
+            <button
+              onClick={() => {
+                setShowSignUpEmail(false);
+                setError('');
+                setSuccessMessage('');
+              }}
+              disabled={isLoading}
+              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
+            >
+              戻る
+            </button>
+          </div>
+        ) : successMessage && !showSignUpEmail ? (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 text-sm">
+              <p className="font-semibold mb-2">認証メールを送信しました</p>
+              <p className="mb-2">{email} に認証メールを送信しました。メール内のリンクをクリックして認証を完了してください。</p>
+              <p className="text-xs text-blue-600 mt-2">
+                ※ メールが届かない場合は、迷惑メールフォルダも確認してください。
+              </p>
+            </div>
+
+            <button
+              onClick={handleResendSignUpEmail}
+              disabled={isLoading}
+              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
+            >
+              {isLoading ? '送信中...' : '認証メールを再送信'}
+            </button>
+
+            <button
+              onClick={() => {
+                setSuccessMessage('');
+                setError('');
+                setShowSignUpEmail(true);
+              }}
+              disabled={isLoading}
+              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
+            >
+              メールアドレスを変更
+            </button>
+          </div>
+        ) : (
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 text-sm">
               <p className="font-semibold mb-2">確認コードを送信しました</p>
@@ -256,26 +415,15 @@ export default function Login() {
           {!showSignUp && (
             <button
               onClick={() => {
-                console.log('🔍 新規登録はこちら: Button clicked, setting showSignUp to true');
-                setShowSignUp(true);
+                console.log('🔍 新規登録はこちら: Button clicked, showing signup email form');
+                setShowSignUpEmail(true);
+                setError('');
+                setSuccessMessage('');
               }}
-              disabled={isLoading || !email || !password}
+              disabled={isLoading}
               className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
             >
               新規登録はこちら
-            </button>
-          )}
-
-          {showSignUp && (
-            <button
-              onClick={() => {
-                console.log('🔍 新規登録ボタン: Button clicked, calling handleSignUp');
-                handleSignUp();
-              }}
-              disabled={isLoading || !email || !password}
-              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
-            >
-              {isLoading ? '作成中...' : '新規登録'}
             </button>
           )}
           </div>
