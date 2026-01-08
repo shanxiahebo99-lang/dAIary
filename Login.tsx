@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { signIn, signUp } from './auth';
+import { supabase } from './supabase';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -8,6 +9,8 @@ export default function Login() {
   const [error, setError] = useState('');
   const [rememberEmail, setRememberEmail] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
+  const [showVerificationCode, setShowVerificationCode] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
 
   // Load saved email from localStorage
   useEffect(() => {
@@ -54,11 +57,51 @@ export default function Login() {
         setError(authError.message);
       } else {
         console.log('✅ handleSignUp: Signup successful:', data);
-        // 新規登録成功時は自動的にログインされる
+        // セッションがnullの場合はメール確認が必要
+        if (!data.session) {
+          console.log('🔍 handleSignUp: Session is null, showing verification code input');
+          setShowVerificationCode(true);
+          setError('');
+        }
+        // セッションがある場合は自動的にログインされる
       }
     } catch (err: any) {
       console.error('❌ handleSignUp: Signup exception:', err);
       setError(err.message || '新規登録に失敗しました。');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!verificationCode || verificationCode.length < 6) {
+      setError('確認コードを正しく入力してください（6桁）');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: verificationCode,
+        type: 'signup',
+      });
+
+      if (verifyError) {
+        console.error('❌ handleVerifyCode: Verification error:', verifyError);
+        setError(verifyError.message || '確認コードが正しくありません');
+      } else {
+        console.log('✅ handleVerifyCode: Verification successful:', data);
+        setShowVerificationCode(false);
+        setVerificationCode('');
+        setError('');
+        // 確認成功後は自動的にログインされる
+      }
+    } catch (err: any) {
+      console.error('❌ handleVerifyCode: Verification exception:', err);
+      setError(err.message || '確認コードの検証に失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +126,45 @@ export default function Login() {
           </div>
         )}
 
-        <div className="space-y-4">
+        {showVerificationCode ? (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 text-sm">
+              <p className="font-semibold mb-2">確認コードを送信しました</p>
+              <p>{email} に確認コードを送信しました。メールを確認して6桁のコードを入力してください。</p>
+            </div>
+
+            <input
+              type="text"
+              placeholder="確認コード（6桁）"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              disabled={isLoading}
+              className="login-input w-full text-center text-2xl tracking-widest"
+              maxLength={6}
+            />
+
+            <button
+              onClick={handleVerifyCode}
+              disabled={isLoading || verificationCode.length !== 6}
+              className="modern-button w-full"
+            >
+              {isLoading ? '確認中...' : '確認コードを送信'}
+            </button>
+
+            <button
+              onClick={() => {
+                setShowVerificationCode(false);
+                setVerificationCode('');
+                setError('');
+              }}
+              disabled={isLoading}
+              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
+            >
+              戻る
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
           <input
             type="email"
             placeholder="メールアドレス"
@@ -146,7 +227,8 @@ export default function Login() {
               {isLoading ? '作成中...' : '新規登録'}
             </button>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
