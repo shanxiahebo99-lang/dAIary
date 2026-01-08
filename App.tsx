@@ -57,22 +57,29 @@ const App: React.FC = () => {
 
   /* ---------------- 認証 ---------------- */
   useEffect(() => {
+    console.log('🔍 Auth listener registered'); // デバッグログ
+    
     const checkAuth = async () => {
+      console.log('🔍 checkAuth: Starting initial auth check');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔍 checkAuth: Session exists?', !!session);
       if (session) {
         // セッションが確立されるまで少し待機
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 300));
         // プロフィールをチェックして、削除されていないか確認
         try {
+          console.log('🔍 checkAuth: Fetching profile...');
           const profile = await getUserProfile();
+          console.log('🔍 checkAuth: Profile fetched:', !!profile);
           if (!profile) {
             // アカウントが削除されている場合はログアウト
+            console.log('🔍 checkAuth: Profile is null, signing out');
             await supabase.auth.signOut();
             setIsAuthenticated(false);
             return;
           }
         } catch (error) {
-          console.error('Error checking profile:', error);
+          console.error('❌ checkAuth: Error checking profile:', error);
         }
       }
       setIsAuthenticated(!!session);
@@ -81,48 +88,95 @@ const App: React.FC = () => {
     checkAuth();
     
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔍 onAuthStateChange: Event =', event, 'Session exists?', !!session);
+      
       // SIGNED_INイベントの場合のみ、セッションが確実に確立されるのを待つ
       if (event === 'SIGNED_IN' && session) {
+        console.log('🔍 onAuthStateChange: SIGNED_IN detected, waiting for authenticated state...');
         // 認証状態が確実にauthenticatedになるまで待機
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 300));
         // セッションを再取得して確実にauthenticated状態にする
-        await supabase.auth.getSession();
+        const { data: { session: refreshedSession } } = await supabase.auth.getSession();
+        console.log('🔍 onAuthStateChange: Refreshed session exists?', !!refreshedSession);
+        
+        if (!refreshedSession) {
+          console.error('❌ onAuthStateChange: No session after refresh');
+          setIsAuthenticated(false);
+          return;
+        }
+        
         // プロフィールをチェック
         try {
+          console.log('🔍 onAuthStateChange: Fetching profile after SIGNED_IN...');
           const profile = await getUserProfile();
+          console.log('🔍 onAuthStateChange: Profile fetched:', !!profile, profile ? { name: profile.name, hasNickname: !!profile.nickname } : null);
+          
           if (!profile) {
+            console.log('🔍 onAuthStateChange: Profile is null, signing out');
             await supabase.auth.signOut();
             setIsAuthenticated(false);
             return;
           }
-        } catch (error) {
-          console.error('Error checking profile after sign in:', error);
+          
+          console.log('✅ onAuthStateChange: Profile loaded successfully, setting authenticated');
+          setIsAuthenticated(true);
+        } catch (error: any) {
+          console.error('❌ onAuthStateChange: Error checking profile after sign in:', error);
+          console.error('❌ Error details:', { code: error?.code, message: error?.message, error });
+          
           // 404エラーの場合はリトライ（RLSがまだ適用されていない可能性）
           if (error && typeof error === 'object' && 'code' in error && error.code === 'PGRST116') {
+            console.log('🔍 onAuthStateChange: 404 error detected, retrying in 500ms...');
+            setTimeout(async () => {
+              try {
+                console.log('🔍 onAuthStateChange: Retrying profile fetch...');
+                const retryProfile = await getUserProfile();
+                console.log('🔍 onAuthStateChange: Retry profile fetched:', !!retryProfile);
+                if (!retryProfile) {
+                  console.log('🔍 onAuthStateChange: Retry profile is null, signing out');
+                  await supabase.auth.signOut();
+                  setIsAuthenticated(false);
+                } else {
+                  console.log('✅ onAuthStateChange: Retry successful, setting authenticated');
+                  setIsAuthenticated(true);
+                }
+              } catch (retryError) {
+                console.error('❌ onAuthStateChange: Error retrying profile check:', retryError);
+              }
+            }, 500);
+          } else {
+            // 404以外のエラーでもリトライを試みる
+            console.log('🔍 onAuthStateChange: Non-404 error, retrying in 500ms...');
             setTimeout(async () => {
               try {
                 const retryProfile = await getUserProfile();
                 if (!retryProfile) {
                   await supabase.auth.signOut();
                   setIsAuthenticated(false);
+                } else {
+                  setIsAuthenticated(true);
                 }
               } catch (retryError) {
-                console.error('Error retrying profile check:', retryError);
+                console.error('❌ onAuthStateChange: Error retrying profile check:', retryError);
               }
             }, 500);
           }
         }
       } else if (event === 'SIGNED_OUT') {
+        console.log('🔍 onAuthStateChange: SIGNED_OUT detected');
         setIsAuthenticated(false);
-        return;
       } else if (session) {
         // その他のイベント（TOKEN_REFRESHED等）でもセッションがある場合は認証済み
+        console.log('🔍 onAuthStateChange: Other event with session:', event);
         setIsAuthenticated(true);
-        return;
+      } else {
+        console.log('🔍 onAuthStateChange: No session, setting unauthenticated');
+        setIsAuthenticated(false);
       }
-      setIsAuthenticated(!!session);
     });
+    
     return () => {
+      console.log('🔍 Auth listener unsubscribed');
       listener.subscription.unsubscribe();
     };
   }, []);
