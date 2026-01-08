@@ -60,6 +60,8 @@ const App: React.FC = () => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        // セッションが確立されるまで少し待機
+        await new Promise(resolve => setTimeout(resolve, 100));
         // プロフィールをチェックして、削除されていないか確認
         try {
           const profile = await getUserProfile();
@@ -78,9 +80,14 @@ const App: React.FC = () => {
     
     checkAuth();
     
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_e, s) => {
-      if (s) {
-        // ログイン時にもプロフィールをチェック
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // SIGNED_INイベントの場合のみ、セッションが確実に確立されるのを待つ
+      if (event === 'SIGNED_IN' && session) {
+        // 認証状態が確実にauthenticatedになるまで待機
+        await new Promise(resolve => setTimeout(resolve, 200));
+        // セッションを再取得して確実にauthenticated状態にする
+        await supabase.auth.getSession();
+        // プロフィールをチェック
         try {
           const profile = await getUserProfile();
           if (!profile) {
@@ -89,10 +96,31 @@ const App: React.FC = () => {
             return;
           }
         } catch (error) {
-          console.error('Error checking profile:', error);
+          console.error('Error checking profile after sign in:', error);
+          // 404エラーの場合はリトライ（RLSがまだ適用されていない可能性）
+          if (error && typeof error === 'object' && 'code' in error && error.code === 'PGRST116') {
+            setTimeout(async () => {
+              try {
+                const retryProfile = await getUserProfile();
+                if (!retryProfile) {
+                  await supabase.auth.signOut();
+                  setIsAuthenticated(false);
+                }
+              } catch (retryError) {
+                console.error('Error retrying profile check:', retryError);
+              }
+            }, 500);
+          }
         }
+      } else if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        return;
+      } else if (session) {
+        // その他のイベント（TOKEN_REFRESHED等）でもセッションがある場合は認証済み
+        setIsAuthenticated(true);
+        return;
       }
-      setIsAuthenticated(!!s);
+      setIsAuthenticated(!!session);
     });
     return () => {
       listener.subscription.unsubscribe();
