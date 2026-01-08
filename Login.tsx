@@ -9,7 +9,6 @@ export default function Login() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [rememberEmail, setRememberEmail] = useState(false);
-  const [showSignUp, setShowSignUp] = useState(false);
   const [showSignUpEmail, setShowSignUpEmail] = useState(false);
   const [showSetPassword, setShowSetPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -65,8 +64,7 @@ export default function Login() {
         console.error('❌ ログインエラー:', authError);
         // アカウントが確認されていない場合のエラーメッセージを改善
         if (authError.message.includes('Email not confirmed') || authError.message.includes('email_not_confirmed')) {
-          setError('メールアドレスが確認されていません。メールに送信された確認コードを入力してください。');
-          setShowVerificationCode(true);
+          setError('メールアドレスが確認されていません。メールに送信された認証URLをクリックして認証を完了してください。');
         } else {
           setError(authError.message);
         }
@@ -327,54 +325,6 @@ export default function Login() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 text-sm">
-              <p className="font-semibold mb-2">確認コードを送信しました</p>
-              <p className="mb-2">{email} に確認コードを送信しました。メールを確認して6桁のコードを入力してください。</p>
-              <p className="text-xs text-blue-600 mt-2">
-                ※ メールが届かない場合は、迷惑メールフォルダも確認してください。
-              </p>
-            </div>
-
-            <input
-              type="text"
-              placeholder="確認コード（6桁）"
-              value={verificationCode}
-              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              disabled={isLoading}
-              className="login-input w-full text-center text-2xl tracking-widest"
-              maxLength={6}
-            />
-
-            <button
-              onClick={handleVerifyCode}
-              disabled={isLoading || verificationCode.length !== 6}
-              className="modern-button w-full"
-            >
-              {isLoading ? '確認中...' : '確認コードを送信'}
-            </button>
-
-            <button
-              onClick={handleResendCode}
-              disabled={isLoading}
-              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
-            >
-              {isLoading ? '送信中...' : '確認コードを再送信'}
-            </button>
-
-            <button
-              onClick={() => {
-                setShowVerificationCode(false);
-                setVerificationCode('');
-                setError('');
-              }}
-              disabled={isLoading}
-              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
-            >
-              戻る
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
           <input
             type="email"
             placeholder="メールアドレス"
@@ -412,20 +362,18 @@ export default function Login() {
             {isLoading ? 'ログイン中...' : 'ログイン'}
           </button>
 
-          {!showSignUp && (
-            <button
-              onClick={() => {
-                console.log('🔍 新規登録はこちら: Button clicked, showing signup email form');
-                setShowSignUpEmail(true);
-                setError('');
-                setSuccessMessage('');
-              }}
-              disabled={isLoading}
-              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
-            >
-              新規登録はこちら
-            </button>
-          )}
+          <button
+            onClick={() => {
+              console.log('🔍 新規登録はこちら: Button clicked, showing signup email form');
+              setShowSignUpEmail(true);
+              setError('');
+              setSuccessMessage('');
+            }}
+            disabled={isLoading}
+            className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
+          >
+            新規登録はこちら
+          </button>
           </div>
         )}
       </div>
