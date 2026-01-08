@@ -6,9 +6,10 @@ export const saveDiaryEntry = async (entry: DiaryEntry): Promise<void> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
-  const { error } = await supabase
+  // 既に存在する場合は更新、存在しない場合は挿入
+  const { error: upsertError } = await supabase
     .from('diary_entries')
-    .insert({
+    .upsert({
       id: entry.id,
       user_id: user.id,
       date: entry.date,
@@ -16,9 +17,15 @@ export const saveDiaryEntry = async (entry: DiaryEntry): Promise<void> => {
       feedback: entry.feedback,
       mood: entry.mood,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'id',
     });
 
-  if (error) throw error;
+  if (upsertError) {
+    console.error('Error upserting diary entry:', upsertError);
+    throw upsertError;
+  }
 };
 
 // ユーザーの日記エントリを取得

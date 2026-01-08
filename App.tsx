@@ -76,27 +76,19 @@ const App: React.FC = () => {
       try {
         // 常にSupabaseからデータを読み込む（アカウントごとに同期）
         const loadedEntries = await getDiaryEntries();
+        console.log('📥 Loaded entries from Supabase:', loadedEntries.length);
         setEntries(loadedEntries);
         
         // プロフィールも常にSupabaseから読み込む
         const loadedProfile = await getUserProfile();
         if (loadedProfile) {
+          console.log('📥 Loaded profile from Supabase:', loadedProfile);
           setProfile(loadedProfile);
         }
       } catch (error) {
-        console.error('Error loading data:', error);
-        // エラー時のみlocalStorageから読み込む（フォールバック）
-        const savedEntries = localStorage.getItem('ai_diary_entries');
-        const savedProfile = localStorage.getItem('ai_diary_profile');
-        if (savedEntries) {
-          const parsedEntries = JSON.parse(savedEntries);
-          if (parsedEntries.length > 0) {
-            setEntries(parsedEntries);
-          }
-        }
-        if (savedProfile) {
-          setProfile(JSON.parse(savedProfile));
-        }
+        console.error('❌ Error loading data from Supabase:', error);
+        // エラー時は空の状態を維持（localStorageは使用しない）
+        setEntries([]);
       }
     };
     
@@ -114,13 +106,14 @@ const App: React.FC = () => {
     const saveProfile = async () => {
       try {
         await saveUserProfile(profile);
+        console.log('✅ Profile saved to Supabase');
       } catch (error) {
-        console.error('Error saving profile:', error);
+        console.error('❌ Error saving profile to Supabase:', error);
       }
     };
     
     saveProfile();
-  }, [profile, isAuthenticated]);
+  }, [profile, isAuthenticated, entries.length]);
 
   /* ---------------- Daily Streak Calculation ---------------- */
   const dailyStreak = useMemo(() => {
@@ -231,9 +224,10 @@ const App: React.FC = () => {
       // Save to Supabase
       try {
         await saveDiaryEntry(newEntry);
-      } catch (error) {
-        console.error('Error saving diary entry:', error);
-        // エラーをユーザーに通知しない（バックグラウンドで保存を試みる）
+        console.log('✅ Diary entry saved to Supabase');
+      } catch (error: any) {
+        console.error('❌ Error saving diary entry to Supabase:', error);
+        alert(`日記の保存に失敗しました: ${error.message || '不明なエラー'}\n\nデータはローカルにのみ保存されています。`);
       }
 
       // Check for milestone (10, 20, 30, 40, 50, ...)

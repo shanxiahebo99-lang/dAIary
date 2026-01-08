@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS diary_entries (
   feedback TEXT NOT NULL,
   mood TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, id)
 );
 
 -- ユーザープロフィールテーブル

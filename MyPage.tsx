@@ -232,17 +232,17 @@ const MyPage: React.FC<MyPageProps> = ({ profile, onProfileUpdate, totalRecordCo
 
       if (profileError) console.error('Error deleting profile:', profileError);
 
-      // アカウントを削除（Supabase Admin APIが必要なため、ここではauth.deleteUserを使用できない）
-      // 実際の実装では、バックエンドエンドポイントを作成するか、Supabase Admin APIを使用する必要があります
-      // ここでは、ユーザーにSupabaseダッシュボードから削除してもらうか、バックエンドエンドポイントを作成する必要があります
-      
+      // データ削除が完了したら、ログアウトしてアカウントを無効化
+      // 注意: Supabaseのauthユーザー自体は削除できませんが、すべてのデータは削除されています
       setMessage({ 
-        type: 'error', 
-        text: 'アカウント削除機能は現在利用できません。サポートにお問い合わせください。' 
+        type: 'success', 
+        text: 'アカウントのデータを削除しました。ログアウトします。' 
       });
       
-      // 代替案: ログアウトして、ユーザーに手動で削除してもらう
-      // await signOut();
+      // 少し待ってからログアウト
+      setTimeout(async () => {
+        await signOut();
+      }, 2000);
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'アカウントの削除に失敗しました' });
     } finally {
