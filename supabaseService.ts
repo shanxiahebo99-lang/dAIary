@@ -191,36 +191,3 @@ export const deleteDiaryEntry = async (entryId: string): Promise<void> => {
   if (error) throw error;
 };
 
-// ユーザーアカウントを削除（日記エントリとプロフィールも削除）
-export const deleteUserAccount = async (password: string): Promise<void> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !user.email) throw new Error('User not authenticated');
-
-  // パスワードで再認証
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: user.email,
-    password: password,
-  });
-
-  if (signInError) {
-    throw new Error('パスワードが正しくありません');
-  }
-
-  // 日記エントリを削除
-  await supabase
-    .from('diary_entries')
-    .delete()
-    .eq('user_id', user.id);
-
-  // プロフィールを削除
-  await supabase
-    .from('user_profiles')
-    .delete()
-    .eq('user_id', user.id);
-
-  // アカウントを削除（Supabase Admin APIが必要なため、ここではauth.deleteUserを使用）
-  // 注意: 実際の実装では、Supabase Admin APIを使用するか、バックエンドエンドポイントを作成する必要があります
-  // ここでは、ユーザーにSupabaseダッシュボードから削除してもらうか、バックエンドエンドポイントを作成する必要があります
-  throw new Error('アカウント削除機能は現在利用できません。サポートにお問い合わせください。');
-};
-
