@@ -28,7 +28,13 @@ export default function Login() {
       const { data, error: authError } = await signIn(email, password);
       if (authError) {
         console.error('❌ ログインエラー:', authError);
-        setError(authError.message);
+        // アカウントが確認されていない場合のエラーメッセージを改善
+        if (authError.message.includes('Email not confirmed') || authError.message.includes('email_not_confirmed')) {
+          setError('メールアドレスが確認されていません。メールに送信された確認コードを入力してください。');
+          setShowVerificationCode(true);
+        } else {
+          setError(authError.message);
+        }
       } else {
         console.log('✅ ログイン成功:', data);
         // Save email if rememberEmail is checked
@@ -107,6 +113,40 @@ export default function Login() {
     }
   };
 
+  const handleResendCode = async () => {
+    setIsLoading(true);
+    setError('');
+
+    try {
+      console.log('🔍 handleResendCode: Resending verification code to', email);
+      // 確認コードを再送信（signupの場合は再度signUpを呼び出す）
+      const { data, error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+
+      if (resendError) {
+        console.error('❌ handleResendCode: Resend error:', resendError);
+        // resendが失敗した場合は、再度signUpを試みる
+        const { error: signUpError } = await signUp(email, password);
+        if (signUpError) {
+          setError(signUpError.message || '確認コードの再送に失敗しました');
+        } else {
+          setError('');
+          // 成功メッセージを表示（エラーがない場合は既に表示されている）
+        }
+      } else {
+        console.log('✅ handleResendCode: Code resent successfully');
+        setError('');
+      }
+    } catch (err: any) {
+      console.error('❌ handleResendCode: Resend exception:', err);
+      setError(err.message || '確認コードの再送に失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="gradient-bg min-h-screen flex items-center justify-center p-4">
       <div className="login-glass p-8 max-w-md w-full">
@@ -130,7 +170,10 @@ export default function Login() {
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-6 text-sm">
               <p className="font-semibold mb-2">確認コードを送信しました</p>
-              <p>{email} に確認コードを送信しました。メールを確認して6桁のコードを入力してください。</p>
+              <p className="mb-2">{email} に確認コードを送信しました。メールを確認して6桁のコードを入力してください。</p>
+              <p className="text-xs text-blue-600 mt-2">
+                ※ メールが届かない場合は、迷惑メールフォルダも確認してください。
+              </p>
             </div>
 
             <input
@@ -149,6 +192,14 @@ export default function Login() {
               className="modern-button w-full"
             >
               {isLoading ? '確認中...' : '確認コードを送信'}
+            </button>
+
+            <button
+              onClick={handleResendCode}
+              disabled={isLoading}
+              className="w-full bg-white bg-opacity-60 backdrop-filter backdrop-blur-lg border border-white border-opacity-40 text-gray-700 py-3 rounded-2xl font-semibold hover:bg-opacity-80 disabled:opacity-50 transition-all duration-300"
+            >
+              {isLoading ? '送信中...' : '確認コードを再送信'}
             </button>
 
             <button
