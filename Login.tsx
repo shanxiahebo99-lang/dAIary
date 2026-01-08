@@ -84,6 +84,22 @@ export default function Login() {
           console.log('✅ checkAuthCallback: Session found, showing password setup');
           setShowSetPassword(true);
           setEmail(session.user.email || '');
+          
+          // セッションを定期的にチェックして、失われていないか確認
+          const sessionCheckInterval = setInterval(async () => {
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            if (!currentSession && showSetPassword) {
+              console.warn('⚠️ Session lost while on password setup screen');
+              clearInterval(sessionCheckInterval);
+              setError('セッションが失われました。もう一度認証メールからリンクをクリックしてください。');
+              setShowSetPassword(false);
+            }
+          }, 5000); // 5秒ごとにチェック
+          
+          // クリーンアップ
+          return () => {
+            clearInterval(sessionCheckInterval);
+          };
         } else {
           console.error('❌ checkAuthCallback: No session found after auth URL click');
           setError('認証に失敗しました。もう一度お試しください。');
@@ -102,10 +118,19 @@ export default function Login() {
         const hasPassword = session.user.user_metadata?.has_password || 
                            session.user.app_metadata?.has_password;
         
-        if (!hasPassword) {
+        if (!hasPassword && !showSetPassword) {
           console.log('✅ onAuthStateChange: User signed in without password, showing password setup');
           setShowSetPassword(true);
           setEmail(session.user.email || '');
+        }
+      }
+      
+      if (event === 'SIGNED_OUT') {
+        // ログアウトされた場合は、パスワード設定画面を閉じる
+        if (showSetPassword) {
+          console.log('⚠️ onAuthStateChange: User signed out, closing password setup');
+          setShowSetPassword(false);
+          setError('セッションが失われました。もう一度認証メールからリンクをクリックしてください。');
         }
       }
     });
@@ -199,21 +224,54 @@ export default function Login() {
     setSuccessMessage('');
 
     try {
-      console.log('🔍 handleSetPassword: Setting password...');
+      console.log('🔍 handleSetPassword: Checking session before setting password...');
+      
+      // セッションを確認
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('❌ handleSetPassword: Session error:', sessionError);
+        setError('セッションが取得できませんでした。もう一度認証メールからリンクをクリックしてください。');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!session) {
+        console.error('❌ handleSetPassword: No session found');
+        setError('セッションが失われています。もう一度認証メールからリンクをクリックしてください。');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('✅ handleSetPassword: Session found, setting password...');
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
       if (updateError) {
-        console.error('❌ handleSetPassword: Error:', updateError);
-        setError(updateError.message || 'パスワードの設定に失敗しました');
+        console.error('❌ handleSetPassword: Update error:', updateError);
+        
+        // セッション関連のエラーの場合
+        if (updateError.message.includes('session') || updateError.message.includes('Auth session missing')) {
+          setError('セッションが失われています。もう一度認証メールからリンクをクリックしてください。');
+        } else {
+          setError(updateError.message || 'パスワードの設定に失敗しました');
+        }
       } else {
         console.log('✅ handleSetPassword: Password set successfully');
-        setSuccessMessage('パスワードを設定しました。ログインできます。');
-        setShowSetPassword(false);
-        setNewPassword('');
-        setConfirmPassword('');
-        // パスワード設定後は自動的にログインされる
+        
+        // セッションを再確認
+        const { data: { session: newSession } } = await supabase.auth.getSession();
+        if (newSession) {
+          setSuccessMessage('パスワードを設定しました。ログインできます。');
+          setShowSetPassword(false);
+          setNewPassword('');
+          setConfirmPassword('');
+          // パスワード設定後は自動的にログインされる
+        } else {
+          setError('パスワードは設定されましたが、セッションが失われました。ログインしてください。');
+          setShowSetPassword(false);
+        }
       }
     } catch (err: any) {
       console.error('❌ handleSetPassword: Exception:', err);
