@@ -69,3 +69,25 @@ CREATE POLICY "Users can delete their own profile"
   ON user_profiles FOR DELETE
   USING (auth.uid() = user_id);
 
+-- 新規ユーザー登録時に自動でプロフィールを作成するトリガー
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.user_profiles (user_id, name, personality, is_deleted)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.email, 'ユーザー'),
+    'supportive',
+    FALSE
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- トリガーを作成（既に存在する場合は置き換え）
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+

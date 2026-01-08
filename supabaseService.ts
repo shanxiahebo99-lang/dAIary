@@ -88,27 +88,48 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('user_profiles')
     .select('*')
     .eq('user_id', user.id)
     .single();
 
-  if (error) {
-    if (error.code === 'PGRST116') {
-      // プロフィールが存在しない場合はデフォルト値を返す
+  // プロフィールが存在しない場合は自動的に作成
+  if (error && error.code === 'PGRST116') {
+    const defaultName = user.email?.split('@')[0] || 'ユーザー';
+    const { data: newProfile, error: insertError } = await supabase
+      .from('user_profiles')
+      .insert({
+        user_id: user.id,
+        name: defaultName,
+        personality: 'supportive',
+        is_deleted: false,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error creating user profile:', insertError);
+      // 作成に失敗した場合はデフォルト値を返す
       return {
-        name: user.email?.split('@')[0] || 'ユーザー',
+        name: defaultName,
         personality: 'supportive',
         customInstruction: '',
       };
     }
+
+    data = newProfile;
+  } else if (error) {
     console.error('Error fetching user profile:', error);
     return null;
   }
 
   // アカウントが削除されている場合はnullを返す
-  if (data.is_deleted) {
+  if (data && data.is_deleted) {
+    return null;
+  }
+
+  if (!data) {
     return null;
   }
 
