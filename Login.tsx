@@ -85,9 +85,6 @@ export default function Login() {
         email,
         options: {
           shouldCreateUser: true,
-          data: {
-            email_verify: true,
-          },
         },
       });
 
@@ -236,9 +233,6 @@ export default function Login() {
         email,
         options: {
           shouldCreateUser: true,
-          data: {
-            email_verify: true,
-          },
         },
       });
 
